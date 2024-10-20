@@ -1,124 +1,44 @@
 import React, { useEffect, useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import axios from 'axios';
-import { TextField, MenuItem, Button, Typography } from '@mui/material';
-import styled from 'styled-components';
+import { MenuItem, Typography } from '@mui/material';
 import CustomSnackbar from './CustomSnackbar';
+import { 
+  FormContainer, 
+  Row, 
+  EqualRow, 
+  StyledTextField, 
+  FullWidthField, 
+  GreenRow, 
+  GreenButton, 
+  CharacterCount 
+} from './styles/FormStyles';
 
 interface FormData {
   nome: string;
   dataInicial: string;
   dataFinal: string;
-  propriedade: { id: number; nome: string } | undefined;
+  infosPropriedade:  { id: number; nome: string; cnpj: string } | undefined;
   cnpj: string;
   laboratorio: { id: number; nome: string } | undefined;
   observacoes: string;
 }
 
-const FormContainer = styled.div`
-  max-width: 90%;
-  margin: 40px auto 0;
-  padding: 20px;
-  background-color: white;
-  border-radius: 4px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-`;
-
-const Row = styled.div`
-  display: flex;
-  gap: 16px;
-  margin-bottom: 16px;
-
-  & > div:first-child {
-    flex: 2; 
-  }
-
-  & > div {
-    flex: 1;
-  }
-`;
-
-const EqualRow = styled.div`
-  display: flex;
-  gap: 16px;
-  margin-bottom: 16px;
-
-  & > div {
-    flex: 1;
-  }
-`;
-
-const StyledTextField = styled(TextField).attrs({
-  variant: 'standard',
-}) <{ error?: boolean }>`
-  & .MuiInput-root {
-    &:before {
-      border-bottom: 2px solid ${({ error }) => (error ? 'red' : '#000')};
-    }
-    &:hover:not(.Mui-disabled):before {
-      border-bottom: 2px solid ${({ error }) => (error ? 'red' : '#007661')};
-    }
-    &:after {
-      border-bottom: 2px solid ${({ error }) => (error ? 'red' : '#007661')};
-    }
-  }
-
-  & .MuiInputLabel-root {
-    color: ${({ error }) => (error ? 'red' : '#7a7a7a')};
-  }
-
-  & .MuiInputLabel-root.Mui-focused {
-    color: ${({ error }) => (error ? 'red' : '#7a7a7a')};
-  }
-`;
-
-const FullWidthField = styled(StyledTextField)`
-  width: 100%;
-`;
-
-const GreenRow = styled.div`
-  width: calc(100% + 7px);
-  margin-left: -19px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background-color: #007661;
-  padding: 8px 16px;
-  margin-bottom: 16px;
-  color: #fff;
-  font-size: 20px;
-  margin-top: -20px;
-`;
-
-const GreenButton = styled(Button).attrs({
-  variant: 'text',
-})`
-  color: #fff !important;
-  background-color: transparent;
-
-  &:hover {
-    background-color: rgba(0, 118, 97, 0.2) !important;
-  }
-`;
-
-const CharacterCount = styled(Typography)`
-  font-size: 12px;
-  color: #7a7a7a;
-  text-align: right;
-  margin-top: 4px;
-`;
-
 const Form: React.FC = () => {
-  const { handleSubmit, control, setValue, watch, formState: { errors }, clearErrors } = useForm<FormData>({
+  const { handleSubmit, control, setValue, watch, formState: { errors }, clearErrors, reset } = useForm<FormData>({
     mode: 'onChange',
   });
-  const [propriedades, setPropriedades] = useState<{ id: number; nome: string }[]>([]);
+  const [propriedades, setPropriedades] = useState<{ id: number; nome: string; cnpj: string }[]>([]);
   const [laboratorios, setLaboratorios] = useState<{ id: number; nome: string }[]>([]);
+  const [selectedCnpj, setSelectedCnpj] = useState<string | null>(null);
   const [snackbarState, setSnackbarState] = useState<{ open: boolean; type: 'success' | 'error'; message: string }>({
     open: false,
     type: 'error',
     message: '',
   });
+
+  const [showDateInputInicial, setShowDateInputInicial] = useState(false);
+  const [showDateInputFinal, setShowDateInputFinal] = useState(false);
 
   const nomeValue = watch('nome', '');
   const observacoesValue = watch('observacoes', '');
@@ -142,12 +62,21 @@ const Form: React.FC = () => {
   }, []);
 
   const onSubmit = (data: FormData) => {
-    console.log(data);
+    const formattedData = {
+      ...data,
+      dataInicial: data.dataInicial ? new Date(data.dataInicial).toISOString() : '',
+      dataFinal: data.dataFinal ? new Date(data.dataFinal).toISOString() : '',
+      observacoes: data.observacoes || '',
+    };
+
+    console.log(formattedData);
     setSnackbarState({
       open: true,
       type: 'success',
       message: 'Cadastro realizado com sucesso!',
     });
+    reset();
+    setSelectedCnpj(null);
   };
 
   const onError = () => {
@@ -156,6 +85,12 @@ const Form: React.FC = () => {
       type: 'error',
       message: 'Preencher os campos obrigatórios',
     });
+  };
+
+  const handleFieldChange = (fieldName: keyof FormData) => {
+    if (errors[fieldName]) {
+      clearErrors(fieldName);
+    }
   };
 
   return (
@@ -195,13 +130,22 @@ const Form: React.FC = () => {
             render={({ field }) => (
               <StyledTextField
                 {...field}
-                type="date"
+                type={showDateInputInicial ? 'date' : 'text'}
                 label="Data Inicial *"
+                placeholder={showDateInputInicial ? '' : 'Data Inicial'}
                 fullWidth
                 margin="normal"
                 error={!!errors.dataInicial}
                 helperText={errors.dataInicial ? "Erro" : ""}
-                InputLabelProps={{ shrink: true }}
+                InputLabelProps={{
+                  shrink: Boolean(field.value) || showDateInputInicial,
+                }}
+                onFocus={() => setShowDateInputInicial(true)}
+                onBlur={(e) => {
+                  if (!field.value) {
+                    setShowDateInputInicial(false);
+                  }
+                }}
               />
             )}
           />
@@ -214,13 +158,22 @@ const Form: React.FC = () => {
             render={({ field }) => (
               <StyledTextField
                 {...field}
-                type="date"
+                type={showDateInputFinal ? 'date' : 'text'}
                 label="Data Final *"
+                placeholder={showDateInputFinal ? '' : 'Data Final'}
                 fullWidth
                 margin="normal"
                 error={!!errors.dataFinal}
                 helperText={errors.dataFinal ? "Erro" : ""}
-                InputLabelProps={{ shrink: true }}
+                InputLabelProps={{
+                  shrink: Boolean(field.value) || showDateInputFinal,
+                }}
+                onFocus={() => setShowDateInputFinal(true)}
+                onBlur={(e) => {
+                  if (!field.value) {
+                    setShowDateInputFinal(false);
+                  }
+                }}
               />
             )}
           />
@@ -230,31 +183,54 @@ const Form: React.FC = () => {
         <EqualRow>
           <div>
             <Controller
-              name="propriedade"
+              name="infosPropriedade"
               control={control}
               defaultValue={undefined}
               rules={{ required: true }}
               render={({ field }) => (
-                <FullWidthField
-                  {...field}
-                  select
-                  label="Propriedade *"
-                  fullWidth
-                  margin="normal"
-                  error={!!errors.propriedade}
-                  helperText={errors.propriedade ? "Erro" : ""}
-                  value={field.value ? JSON.stringify(field.value) : ''}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-                    const value = JSON.parse(e.target.value);
-                    setValue('propriedade', value);
-                  }}
-                >
-                  {propriedades.map((prop) => (
-                    <MenuItem key={prop.id} value={JSON.stringify(prop)}>
-                      {prop.nome}
-                    </MenuItem>
-                  ))}
-                </FullWidthField>
+                <>
+                  <FullWidthField
+                    {...field}
+                    select
+                    label="Propriedade *"
+                    fullWidth
+                    margin="normal"
+                    error={!!errors.infosPropriedade}
+                    helperText={errors.infosPropriedade ? "Erro" : ""}
+                    value={field.value?.id || ''}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+                      const value = JSON.parse(e.target.value);
+                      setSelectedCnpj(value.cnpj);
+                      setValue('infosPropriedade', value);
+                      handleFieldChange('infosPropriedade');
+                    }}
+                    SelectProps={{
+                      renderValue: (selected) => {
+                        if (!selected) return '';
+                        const selectedId = selected as number;
+                        const selectedPropriedade = propriedades.find((prop) => prop.id === selectedId);
+                        return selectedPropriedade ? selectedPropriedade.nome : '';
+                      },
+                    }}
+                  >
+                    {propriedades.map((prop) => (
+                      <MenuItem key={prop.id} value={JSON.stringify(prop)}>
+                        <div>
+                          <Typography variant="body1">{prop.nome}</Typography>
+                          <Typography variant="body2" style={{ color: '#b0b0b0' }}>
+                            CNPJ: {prop.cnpj}
+                          </Typography>
+                        </div>
+                      </MenuItem>
+                    ))}
+                  </FullWidthField>
+
+                  {selectedCnpj && (
+                    <Typography variant="body2" style={{ marginTop: '8px', color: '#7a7a7a' }}>
+                      CNPJ: {selectedCnpj}
+                    </Typography>
+                  )}
+                </>
               )}
             />
           </div>
@@ -277,6 +253,7 @@ const Form: React.FC = () => {
                   value={field.value ? JSON.stringify(field.value) : ''}
                   onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
                     const value = JSON.parse(e.target.value);
+                    handleFieldChange('laboratorio');
                     setValue('laboratorio', value);
                   }}
                 >
