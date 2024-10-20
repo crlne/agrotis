@@ -7,7 +7,6 @@ body {
     font-family: 'Roboto',  sans-serif;
     background-color: #fff;
 }
-
 `
 
 export default GlobalStyles;
